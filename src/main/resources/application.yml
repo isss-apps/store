@@ -1,0 +1,18 @@
+spring:
+  main:
+    sources: org.foobarter.isss.store
+
+management:
+  port: 8081
+
+server:
+  port: -1
+
+camel:
+  springboot:
+    # The Camel context name
+    name: ISSSStore
+    main-run-controller: true
+
+logging:
+  config: "classpath:logback.xml"

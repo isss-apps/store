@@ -78,17 +78,24 @@ public class StoreRoute extends RouteBuilder {
 				// store catalog in the headers for further processing
 				.setHeader("catalog", body())
 
+				.to("log:catalog?level=INFO&showAll=true&multiline=true")
+
 				.choice()
-					.when(simple("${header.catalog.storeId} != null"))
-						.to("direct:storedb-query")
+					.when(simple("${body.storeId} == ''"))
+						.to("direct:notavailable")
 					.otherwise()
-						.to("direct:notavailable");
+						.to("direct:storedb-query")
+
+				.endChoice();
 
 		from("direct:storedb-query")
 				.to("sql:select id, stock, supplier_days from items where id = :#${header.catalog.storeId}?" +
 						"dataSource=dataSource&" +
 						"outputType=SelectOne&" +
 						"outputClass=org.foobarter.isss.store.model.storedb.AvailabilityResult")
+
+				.to("log:db?level=INFO&showAll=true&multiline=true")
+
 				.choice()
 					.when(simple("${header.CamelSqlRowCount} == 0"))
 						.to("direct:notavailable")

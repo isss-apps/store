@@ -50,31 +50,29 @@ public class StoreRoute extends RouteBuilder {
 				.removeHeader("CamelServletContextPath")
 				.end();
 
-		from("direct:catalogList")
+		from("direct:catalog-get-request")
 				.to("direct:clean-http-headers")
 				.setHeader(Exchange.HTTP_METHOD, constant("GET"))
 				.setHeader(Exchange.CONTENT_TYPE, simple("application/json"))
-				.setHeader(Exchange.HTTP_PATH, simple("/entries/list/${header.id}"))
+				.setHeader(Exchange.HTTP_PATH, header("catalog-query-path"))
 				.removeHeader("id")
-				.to("jetty:http://catalog.foobarter.org:8080")
+				.removeHeader("catalog-query-path")
+				.to("jetty:http://catalog.foobarter.org:8080");
+
+		from("direct:catalogList")
+				.setHeader("catalog-query-path", simple("/entries/list/${header.id}"))
+				.to("direct:catalog-get-request")
 				.unmarshal(clientCatalogEntriesListDataFormat);
 
 		from("direct:catalogRoot")
-				.to("direct:clean-http-headers")
-				.setHeader(Exchange.HTTP_METHOD, constant("GET"))
-				.setHeader(Exchange.CONTENT_TYPE, simple("application/json"))
-				.setHeader(Exchange.HTTP_PATH, simple("/entries/list"))
-				.to("jetty:http://catalog.foobarter.org:8080")
+				.setHeader("catalog-query-path", constant("/entries/list"))
+				.to("direct:catalog-get-request")
 				.unmarshal(clientCatalogEntriesListDataFormat);
 
 		from("direct:availability")
 				.to("direct:clean-http-headers")
-				.setHeader(Exchange.HTTP_METHOD, constant("GET"))
-				.setHeader(Exchange.CONTENT_TYPE, simple("application/json"))
-				.setHeader(Exchange.HTTP_PATH, simple("/entries/${header.id}"))
-				.removeHeader("id")
-
-				.to("jetty:http://catalog.foobarter.org:8080")
+				.setHeader("catalog-query-path", simple("/entries/${header.id}"))
+				.to("direct:catalog-get-request")
 				.unmarshal().json(JsonLibrary.Jackson, CatalogEntry.class)
 
 				// store catalog in the headers for further processing

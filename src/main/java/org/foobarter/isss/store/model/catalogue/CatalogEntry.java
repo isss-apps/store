@@ -61,4 +61,16 @@ public class CatalogEntry {
 	public void setRootCategory(Long rootCategory) {
 		this.rootCategory = rootCategory;
 	}
+
+	@Override
+	public String toString() {
+		return "CatalogEntry{" +
+				"id=" + id +
+				", storeId=" + storeId +
+				", name='" + name + '\'' +
+				", price=" + price +
+				", isDir=" + isDir +
+				", rootCategory=" + rootCategory +
+				'}';
+	}
 }

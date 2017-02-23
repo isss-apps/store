@@ -2,6 +2,9 @@ spring:
   main:
     sources: org.foobarter.isss.store
 
+  datasource:
+    url: jdbc:postgresql://storedb.foobarter.org/isss
+
 management:
   port: 8081
 
@@ -13,6 +16,10 @@ camel:
     # The Camel context name
     name: ISSSStore
     main-run-controller: true
+
+    spring:
+      # Spring JDBC configuration
+
 
 logging:
   config: "classpath:logback.xml"

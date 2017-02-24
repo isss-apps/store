@@ -1,6 +1,7 @@
 package org.foobarter.isss.store;
 
 import org.apache.camel.Exchange;
+import org.apache.camel.Processor;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.component.jackson.JacksonDataFormat;
 import org.apache.camel.model.dataformat.JsonLibrary;
@@ -8,7 +9,12 @@ import org.apache.camel.model.rest.RestBindingMode;
 
 import org.foobarter.isss.store.model.catalogue.CatalogEntry;
 import org.foobarter.isss.store.model.client.ClientCatalogEntry;
+import org.foobarter.isss.store.model.client.ClientOrder;
+import org.foobarter.isss.store.model.client.ClientOrderItem;
 import org.foobarter.isss.store.model.client.ItemAvailability;
+import org.foobarter.isss.store.model.order.Order;
+import org.foobarter.isss.store.model.order.OrderItem;
+import org.foobarter.isss.store.model.order.OrderReceipt;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -24,8 +30,17 @@ public class StoreRoute extends RouteBuilder {
 	@Autowired
 	private ItemAvailabilityProcessor itemAvailabilityProcessor;
 
+	@Autowired
+	private NoHeaderStrategy noHeaderStrategy;
+
+	@Autowired
+	private OrderItemAggregationStrategy orderItemAggregationStrategy;
+
     @Override
     public void configure() throws Exception {
+
+    	getContext().getRegistry().lookupByName("noHeaderStrategy").toString();
+
 		restConfiguration().component("jetty").host("0.0.0.0").port(8080).bindingMode(RestBindingMode.auto);
 
 		final JacksonDataFormat clientCatalogEntriesListDataFormat = new JacksonDataFormat();
@@ -44,6 +59,13 @@ public class StoreRoute extends RouteBuilder {
 				.get("/list").outTypeList(ClientCatalogEntry.class)
 					.to("direct:catalogRoot");
 
+		rest("/order")
+				.consumes("application/json")
+				.produces("application/json")
+				.put().type(ClientOrder.class).outType(OrderReceipt.class)
+					.to("direct:order");
+
+
 		from("direct:clean-http-headers")
 				.removeHeaders("CamelHttp*")
 				.removeHeader("Host")
@@ -55,9 +77,8 @@ public class StoreRoute extends RouteBuilder {
 				.setHeader(Exchange.HTTP_METHOD, constant("GET"))
 				.setHeader(Exchange.CONTENT_TYPE, simple("application/json"))
 				.setHeader(Exchange.HTTP_PATH, header("catalog-query-path"))
-				.removeHeader("id")
-				.removeHeader("catalog-query-path")
-				.to("jetty:http://catalog.foobarter.org:8080");
+				.to("log:jetty-request?level=INFO&showAll=true&multiline=true&showStreams=true")
+				.to("jetty:http://catalog.foobarter.org:8080?headerFilterStrategy=noHeaderStrategy");
 
 		from("direct:catalogList")
 				.setHeader("catalog-query-path", simple("/entries/list/${header.id}"))
@@ -106,6 +127,46 @@ public class StoreRoute extends RouteBuilder {
 		from("direct:notavailable")
 				.setHeader("CamelHttpResponseCode", simple("404"))
 				.setFaultBody(constant("This item is not available anymore, sorry for inconvenience!"));
+
+		from("direct:order")
+				.to("log:order?level=INFO&showAll=true&multiline=true")
+				.setHeader("clientOrder", body())
+				//.setHeader("items", simple("${body.items}"))
+				.to("log:header?level=INFO&showAll=true&multiline=true")
+				.split(simple("${body.items}"), orderItemAggregationStrategy)
+					.to("log:item?level=INFO&showAll=true&multiline=true")
+					.setHeader("catalog-query-path", simple("/entries/${body.catalogId}"))
+					.setHeader("clientOrderItem", body())
+					.setBody(constant(null))
+					.to("direct:catalog-get-request")
+					.unmarshal().json(JsonLibrary.Jackson, CatalogEntry.class)
+					.to("log:response?level=INFO&showAll=true&multiline=true")
+					.process(x -> {
+						ClientOrderItem clientOrderItem = x.getIn().getHeader("clientOrderItem", ClientOrderItem.class);
+						CatalogEntry catalogEntry = x.getIn().getBody(CatalogEntry.class);
+
+						OrderItem orderItem = new OrderItem();
+
+						orderItem.setAmount(clientOrderItem.getAmount());
+						orderItem.setItemPrice(catalogEntry.getPrice());
+						orderItem.setStoreId(catalogEntry.getStoreId());
+
+						x.getOut().setHeaders(x.getIn().getHeaders());
+						x.getOut().setBody(orderItem);
+					})
+				.to("log:processed?level=INFO&showAll=true&multiline=true")
+				.end()
+				.to("log:aggregated?level=INFO&showAll=true&multiline=true")
+
+				.to("direct:clean-http-headers")
+				.setHeader(Exchange.HTTP_METHOD, constant("PUT"))
+				.setHeader(Exchange.CONTENT_TYPE, simple("application/json"))
+				.setHeader(Exchange.HTTP_PATH, constant("/order"))
+
+				.marshal().json(JsonLibrary.Jackson, Order.class)
+				.to("jetty:http://ordering.foobarter.org:8080?headerFilterStrategy=noHeaderStrategy")
+				.to("log:receipt?level=INFO&showAll=true&multiline=true")
+				.unmarshal().json(JsonLibrary.Jackson, OrderReceipt.class);
 
 	}
 }

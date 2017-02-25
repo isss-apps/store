@@ -8,6 +8,81 @@
 <script src="jquery.js"></script>
 <script>
 
+    var basket = [];
+
+    updateBasketList = function () {
+        $("#basket").html("");
+        var checkout = false;
+        basket.forEach(function (basketItem) {
+            $("#basket").append("<li>" + basketItem.amount + " " + basketItem.name + "</li>");
+
+            checkout = true;
+        });
+
+        return checkout;
+    }
+
+    updateBasket = function () {
+
+        var checkout = updateBasketList();
+
+        if (checkout) {
+            var checkoutButton = $("<button>Checkout</button>");
+            checkoutButton.on("click", function (btn) {
+                updateBasketList();
+                $("#header").html("Place order");
+                $("#list").html("");
+
+                var nameInput = $("<input />");
+                var addressInput = $("<input />");
+                var finishOrderButton = $("<button>Place order</button>");
+
+                $("#list").append("Name");
+                $("#list").append(nameInput);
+                $("#list").append("<br/>");
+                $("#list").append("Address");
+                $("#list").append(addressInput);
+                $("#list").append("<br/>");
+                $("#list").append(finishOrderButton);
+
+                finishOrderButton.on("click", function () {
+
+                    var order = {};
+                    order.name = nameInput.val();
+                    order.address = addressInput.val();
+
+                    order.items = [];
+                    basket.forEach(function (basketItem) {
+                       clientOrderItem = {};
+
+                       clientOrderItem.catalogId = basketItem.catalogId;
+                       clientOrderItem.amount = basketItem.amount;
+
+                       order.items.push(clientOrderItem);
+                    });
+
+                    $.ajax({
+                        url: '/order',
+                        type: 'PUT',
+                        data: JSON.stringify(order),
+                        contentType: "application/json",
+                        dataType: "json",
+                        processData: false,
+                        success: function (response) {
+                            $("#header").html("");
+                            $("#list").html("");
+                            $("#list").append("<p>" + response.message + "</p>");
+                            basket = [];
+                            updateBasket();
+                        }
+                        }
+                    );
+                })
+            })
+            $("#basket").append(checkoutButton);
+        }
+    };
+
     catalogListCallback = function (list) {
         $("#list").html("");
 
@@ -33,6 +108,32 @@
                             $("#list").html("Not currently in stock, usually delivered within "  + availibility.supplierDays + " days.");
                         }
 
+                        var button = $("<button>Add to basket</button>").on("click", function () {
+                            //alert("ordering");
+
+                            added = false;
+                            basket.forEach(function (basketItem) {
+                                if (basketItem.catalogId == catalogEntry.id) {
+                                    basketItem.amount += 1;
+                                    added = true;
+                                }
+                            });
+
+                            if (!added) {
+                                clientOrderItem = {};
+                                clientOrderItem.catalogId = catalogEntry.id;
+                                clientOrderItem.amount = 1;
+
+                                clientOrderItem.price = catalogEntry.price;
+                                clientOrderItem.name = catalogEntry.name;
+
+                                basket.push(clientOrderItem);
+                            }
+
+                            updateBasket();
+                        });
+
+                        $("#list").append(button);
                     });
                 });
             }
@@ -55,7 +156,10 @@
 
 <h1 id="header">Categories</h1>
 
-<ul id="list"/>
+<ul id="list"></ul>
+
+<h1>Basket</h1>
+<ul id="basket"></ul>
 
 </body>
 </html>

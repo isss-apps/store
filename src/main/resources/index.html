@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Foobarter Store</title>
+</head>
+<body>
+<script src="jquery.js"></script>
+<script>
+
+    catalogListCallback = function (list) {
+        $("#list").html("");
+
+        list.forEach(function (catalogEntry) {
+
+            if (catalogEntry.dir) {
+                var item = $("<li>" + catalogEntry.name + "</li>");
+                item.on("click", function (i) {
+                    $("#header").html(catalogEntry.name);
+                    $.get("/catalog/list/" + catalogEntry.id, catalogListCallback);
+                });
+            }
+            else {
+                var item = $("<li>" + catalogEntry.name + " " + catalogEntry.price + "</li>");
+                item.on("click", function (i) {
+                    $("#header").html(catalogEntry.name + " " + catalogEntry.price);
+                    $("#list").html("");
+                    $.get("/availability/" + catalogEntry.id, function (availibility) {
+                        if (availibility.inStock) {
+                            $("#list").html("In stock! Order now for next day delivery!");
+                        }
+                        else if (availibility.supplierDays) {
+                            $("#list").html("Not currently in stock, usually delivered within "  + availibility.supplierDays + " days.");
+                        }
+
+                    });
+                });
+            }
+            item.appendTo($("#list"));
+        });
+    }
+
+    home = function (x) {
+        $("#header").html("Categories");
+        $.get("/catalog/list", catalogListCallback);
+    }
+
+    $(document).ready(function() {
+        home(null);
+        $("#home").on("click", home);
+    });
+</script>
+
+<a id="home">Home</a>
+
+<h1 id="header">Categories</h1>
+
+<ul id="list"/>
+
+</body>
+</html>

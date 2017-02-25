@@ -47,6 +47,21 @@ public class StoreRoute extends RouteBuilder {
 		clientCatalogEntriesListDataFormat.useList();
 		clientCatalogEntriesListDataFormat.setUnmarshalType(ClientCatalogEntry.class);
 
+		rest("/")
+				.get("/")
+					.route()
+						.process(x -> {
+							x.getOut().setHeader(Exchange.CONTENT_TYPE, "text/html");
+							x.getOut().setBody(StoreRoute.class.getResourceAsStream("/index.html"));
+						})
+					.endRest()
+				.get("/jquery.js")
+					.route()
+						.process(x -> {
+							x.getOut().setHeader(Exchange.CONTENT_TYPE, "text/javascript");
+							x.getOut().setBody(StoreRoute.class.getResourceAsStream("/jquery.js"));
+						});
+
 		rest("/availability")
 				.produces("application/json")
 				.get("/{id}").outType(ItemAvailability.class)

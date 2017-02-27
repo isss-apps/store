@@ -74,14 +74,42 @@
                             $("#list").append("<p>" + response.message + "</p>");
                             basket = [];
                             updateBasket();
-                        }
-                        }
-                    );
+                        },
+                    });
                 })
             })
             $("#basket").append(checkoutButton);
         }
     };
+
+    function addToBasketButton(catalogEntry) {
+        var button = $("<button>Add to basket</button>").on("click", function () {
+            //alert("ordering");
+
+            added = false;
+            basket.forEach(function (basketItem) {
+                if (basketItem.catalogId == catalogEntry.id) {
+                    basketItem.amount += 1;
+                    added = true;
+                }
+            });
+
+            if (!added) {
+                clientOrderItem = {};
+                clientOrderItem.catalogId = catalogEntry.id;
+                clientOrderItem.amount = 1;
+
+                clientOrderItem.price = catalogEntry.price;
+                clientOrderItem.name = catalogEntry.name;
+
+                basket.push(clientOrderItem);
+            }
+
+            updateBasket();
+        });
+
+        $("#list").append(button);
+    }
 
     catalogListCallback = function (list) {
         $("#list").html("");
@@ -108,32 +136,11 @@
                             $("#list").html("Not currently in stock, usually delivered within "  + availibility.supplierDays + " days.");
                         }
 
-                        var button = $("<button>Add to basket</button>").on("click", function () {
-                            //alert("ordering");
+                        addToBasketButton(catalogEntry);
 
-                            added = false;
-                            basket.forEach(function (basketItem) {
-                                if (basketItem.catalogId == catalogEntry.id) {
-                                    basketItem.amount += 1;
-                                    added = true;
-                                }
-                            });
-
-                            if (!added) {
-                                clientOrderItem = {};
-                                clientOrderItem.catalogId = catalogEntry.id;
-                                clientOrderItem.amount = 1;
-
-                                clientOrderItem.price = catalogEntry.price;
-                                clientOrderItem.name = catalogEntry.name;
-
-                                basket.push(clientOrderItem);
-                            }
-
-                            updateBasket();
-                        });
-
-                        $("#list").append(button);
+                    }).fail(function (jqXHR, textStatus, errorThrown) {
+                        $("#list").html(jqXHR.responseText);
+                        addToBasketButton(catalogEntry);
                     });
                 });
             }

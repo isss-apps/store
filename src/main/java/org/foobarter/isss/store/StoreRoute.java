@@ -1,7 +1,6 @@
 package org.foobarter.isss.store;
 
 import org.apache.camel.Exchange;
-import org.apache.camel.Processor;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.component.jackson.JacksonDataFormat;
 import org.apache.camel.model.dataformat.JsonLibrary;
@@ -18,6 +17,9 @@ import org.foobarter.isss.store.model.order.OrderReceipt;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.dao.DataAccessResourceFailureException;
+
+import java.util.concurrent.RejectedExecutionException;
 
 @SpringBootApplication
 public class StoreRoute extends RouteBuilder {
@@ -121,14 +123,35 @@ public class StoreRoute extends RouteBuilder {
 						.to("direct:notavailable")
 					.otherwise()
 						.to("direct:storedb-query")
+						//.to("direct:storedb-query-with-circuit-breaker")
 
 				.endChoice();
 
+		from("direct:storedb-query-with-circuit-breaker")
+			.onException(RejectedExecutionException.class)
+				.handled(true)
+					.setHeader("CamelHttpResponseCode", simple("503"))
+					.setBody(constant("Store DB has been too busy, giving her a rest, availability and delivery dates not currently available."))
+			.end()
+				.loadBalance()
+					.circuitBreaker(2, 30_000L, DataAccessResourceFailureException.class)
+					.to("direct:storedb-query")
+				.end();
+
 		from("direct:storedb-query")
-				.to("sql:select id, stock, supplier_days from items where id = :#${header.catalog.storeId}?" +
+
+				// POI: timeout
+				.onException(DataAccessResourceFailureException.class)
+					.handled(true)
+					.setHeader("CamelHttpResponseCode", simple("503"))
+					.setBody(constant("Store DB takes a bit too much time, availability and delivery dates not currently available."))
+				.end()
+
+				.to("sql:select id, stock, supplier_days from store_slow where id = :#${header.catalog.storeId}?" +
 						"dataSource=dataSource&" +
 						"outputType=SelectOne&" +
-						"outputClass=org.foobarter.isss.store.model.storedb.AvailabilityResult")
+						"outputClass=org.foobarter.isss.store.model.storedb.AvailabilityResult&" +
+						"template.queryTimeout=5") // POI: timeout
 
 				.to("log:db?level=INFO&showAll=true&multiline=true")
 
@@ -141,7 +164,7 @@ public class StoreRoute extends RouteBuilder {
 
 		from("direct:notavailable")
 				.setHeader("CamelHttpResponseCode", simple("404"))
-				.setFaultBody(constant("This item is not available anymore, sorry for inconvenience!"));
+				.setBody(constant("This item is not available anymore, sorry for inconvenience!"));
 
 		from("direct:order")
 				.to("log:order?level=INFO&showAll=true&multiline=true")

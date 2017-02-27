@@ -46,12 +46,18 @@ public class StoreRoute extends RouteBuilder {
 	@Value("${service.store.catalog.url}")
 	private String storeCatalogServiceUrl;
 
+	@Value("${rest.host}")
+	private String host;
+
+	@Value("${rest.port}")
+	private int port;
+
     @Override
     public void configure() throws Exception {
 
     	getContext().getRegistry().lookupByName("noHeaderStrategy").toString();
 
-		restConfiguration().component("jetty").host("0.0.0.0").port(8080).bindingMode(RestBindingMode.auto);
+		restConfiguration().component("jetty").host(host).port(port).bindingMode(RestBindingMode.auto);
 
 		final JacksonDataFormat clientCatalogEntriesListDataFormat = new JacksonDataFormat();
 		clientCatalogEntriesListDataFormat.useList();

@@ -9,6 +9,7 @@ import org.foobarter.isss.store.model.order.Order;
 import org.foobarter.isss.store.model.order.OrderItem;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.LinkedList;
 import java.util.UUID;
 
@@ -37,8 +38,10 @@ public class OrderItemAggregationStrategy implements AggregationStrategy {
 		else {
 			order = oldExchange.getIn().getBody(Order.class);
 		}
-
-		order.getItems().add(newExchange.getIn().getBody(OrderItem.class));
+		final OrderItem orderItem = newExchange.getIn().getBody(OrderItem.class);
+		order.getItems().add(orderItem);
+		// count price of OrderItem
+		order.updatePrice(orderItem.getItemPrice().multiply(new BigDecimal(orderItem.getAmount())));
 
 		oldExchange.getOut().setBody(order);
 

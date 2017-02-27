@@ -11,6 +11,13 @@ management:
 server:
   port: -1
 
+service:
+  store:
+    catalog:
+      url: "http://catalog.foobarter.org:8080"
+    order:
+      url: "http://ordering.foobarter.org:8080"
+
 camel:
   springboot:
     # The Camel context name

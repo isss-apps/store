@@ -14,9 +14,9 @@ server:
 service:
   store:
     catalog:
-      url: "http://catalog.foobarter.org:8080"
+      url: "http://backend.foobarter.org:8080"
     order:
-      url: "http://ordering.foobarter.org:8080"
+      url: "http://backend.foobarter.org:8080"
 
 camel:
   springboot:

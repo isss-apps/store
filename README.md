@@ -7,9 +7,12 @@ mvn clean package
 
 # running
 
-export SPRING\_DATASOURCE\_USERNAME=student
-export SPRING\_DATASOURCE\_PASSWORD=<password>
+export SPRING_DATASOURCE_USERNAME=student
+
+export SPRING_DATASOURCE_PASSWORD=<password>
 
 mvn spring-boot:run
+
+
 
 

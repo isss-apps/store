@@ -56,6 +56,7 @@ public class StoreRoute extends RouteBuilder {
     public void configure() throws Exception {
 
     	getContext().getRegistry().lookupByName("noHeaderStrategy").toString();
+		getContext().getShutdownStrategy().setTimeout(10);
 
 		restConfiguration().component("jetty").host(host).port(port).bindingMode(RestBindingMode.auto);
 
@@ -108,8 +109,14 @@ public class StoreRoute extends RouteBuilder {
 				.setHeader(Exchange.HTTP_METHOD, constant("GET"))
 				.setHeader(Exchange.CONTENT_TYPE, simple("application/json"))
 				.setHeader(Exchange.HTTP_PATH, header("catalog-query-path"))
-				.to("log:jetty-request?level=INFO&showAll=true&multiline=true&showStreams=true")
-				.to("jetty:" + storeCatalogServiceUrl + "?headerFilterStrategy=noHeaderStrategy");
+				.setHeader(Exchange.HTTP_URI, constant(storeCatalogServiceUrl))
+				.to("direct:http-request");
+				//.to("log:jetty-request?level=INFO&showAll=true&multiline=true&showStreams=true")
+				//.to("jetty:" + storeCatalogServiceUrl + "?headerFilterStrategy=noHeaderStrategy");
+
+		from("direct:http-request")
+				.to("log:http-request?level=INFO&showAll=true&multiline=true&showStreams=true")
+				.to("http4:foobarter.org:8080?headerFilterStrategy=noHeaderStrategy");
 
 		from("direct:catalogList")
 				.setHeader("catalog-query-path", simple("/entries/list/${header.id}"))
@@ -214,9 +221,12 @@ public class StoreRoute extends RouteBuilder {
 				.setHeader(Exchange.HTTP_METHOD, constant("PUT"))
 				.setHeader(Exchange.CONTENT_TYPE, simple("application/json"))
 				.setHeader(Exchange.HTTP_PATH, constant("/order"))
+				.setHeader(Exchange.HTTP_URI, constant(storeOrderServiceUrl))
 
 				.marshal().json(JsonLibrary.Jackson, Order.class)
-				.to("jetty:" + storeOrderServiceUrl + "?headerFilterStrategy=noHeaderStrategy")
+
+				.to("direct:http-request")
+				//.to("jetty:" + storeOrderServiceUrl + "?headerFilterStrategy=noHeaderStrategy")
 				.to("log:receipt?level=INFO&showAll=true&multiline=true")
 				.unmarshal().json(JsonLibrary.Jackson, OrderReceipt.class);
 

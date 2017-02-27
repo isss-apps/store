@@ -17,6 +17,7 @@ service:
       url: "http://backend.foobarter.org:8080"
     order:
       url: "http://backend.foobarter.org:8080"
+      #url: "http://order.foobarter.org:8080"
 
 camel:
   springboot:

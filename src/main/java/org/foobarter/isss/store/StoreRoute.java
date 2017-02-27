@@ -1,7 +1,6 @@
 package org.foobarter.isss.store;
 
 import org.apache.camel.Exchange;
-import org.apache.camel.Processor;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.component.jackson.JacksonDataFormat;
 import org.apache.camel.model.dataformat.JsonLibrary;
@@ -16,6 +15,7 @@ import org.foobarter.isss.store.model.order.Order;
 import org.foobarter.isss.store.model.order.OrderItem;
 import org.foobarter.isss.store.model.order.OrderReceipt;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
@@ -35,6 +35,13 @@ public class StoreRoute extends RouteBuilder {
 
 	@Autowired
 	private OrderItemAggregationStrategy orderItemAggregationStrategy;
+
+
+	@Value("${service.store.order.url}")
+	private String storeOrderServiceUrl;
+
+	@Value("${service.store.catalog.url}")
+	private String storeCatalogServiceUrl;
 
     @Override
     public void configure() throws Exception {
@@ -93,7 +100,7 @@ public class StoreRoute extends RouteBuilder {
 				.setHeader(Exchange.CONTENT_TYPE, simple("application/json"))
 				.setHeader(Exchange.HTTP_PATH, header("catalog-query-path"))
 				.to("log:jetty-request?level=INFO&showAll=true&multiline=true&showStreams=true")
-				.to("jetty:http://catalog.foobarter.org:8080?headerFilterStrategy=noHeaderStrategy");
+				.to("jetty:" + storeCatalogServiceUrl + "?headerFilterStrategy=noHeaderStrategy");
 
 		from("direct:catalogList")
 				.setHeader("catalog-query-path", simple("/entries/list/${header.id}"))
@@ -179,7 +186,7 @@ public class StoreRoute extends RouteBuilder {
 				.setHeader(Exchange.HTTP_PATH, constant("/order"))
 
 				.marshal().json(JsonLibrary.Jackson, Order.class)
-				.to("jetty:http://ordering.foobarter.org:8080?headerFilterStrategy=noHeaderStrategy")
+				.to("jetty:" + storeOrderServiceUrl + "?headerFilterStrategy=noHeaderStrategy")
 				.to("log:receipt?level=INFO&showAll=true&multiline=true")
 				.unmarshal().json(JsonLibrary.Jackson, OrderReceipt.class);
 

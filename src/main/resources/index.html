@@ -117,14 +117,14 @@
         list.forEach(function (catalogEntry) {
 
             if (catalogEntry.dir) {
-                var item = $("<li>" + catalogEntry.name + "</li>");
+                var item = $("<li><a href=\"#\">" + catalogEntry.name + "</a></li>");
                 item.on("click", function (i) {
                     $("#header").html(catalogEntry.name);
                     $.get("/catalog/list/" + catalogEntry.id, catalogListCallback);
                 });
             }
             else {
-                var item = $("<li>" + catalogEntry.name + " " + catalogEntry.price + "</li>");
+                var item = $("<li><a href=\"#\">"  + catalogEntry.name + "</a>" + " " + catalogEntry.price + "</li>");
                 item.on("click", function (i) {
                     $("#header").html(catalogEntry.name + " " + catalogEntry.price);
                     $("#list").html("");

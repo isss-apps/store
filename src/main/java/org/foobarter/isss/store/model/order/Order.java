@@ -1,11 +1,13 @@
 package org.foobarter.isss.store.model.order;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 public class Order {
 	private String uuid;
 	private Customer customer;
 	private List<OrderItem> items;
+	private BigDecimal price = new BigDecimal(0);
 
 	public String getUuid() {
 		return uuid;
@@ -29,6 +31,10 @@ public class Order {
 
 	public void setItems(List<OrderItem> items) {
 		this.items = items;
+	}
+
+	public void updatePrice(BigDecimal price) {
+		this.price = this.price.add(price);
 	}
 
 	@Override

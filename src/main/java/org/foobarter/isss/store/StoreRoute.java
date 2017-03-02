@@ -84,20 +84,20 @@ public class StoreRoute extends RouteBuilder {
 		rest("/catalog")
 				.produces("application/json")
 				.get("/list/{id}").outTypeList(ClientCatalogEntry.class)
-					.to("direct:TODO") // TODO
+					.to("direct:catalogList")
 				.get("/list").outTypeList(ClientCatalogEntry.class)
-					.to("direct:TODO"); // TODO
+					.to("direct:catalogRoot");
 
 		rest("/availability")
 				.produces("application/json")
 				.get("/{id}").outType(ItemAvailability.class)
-					.to("direct:TODO"); // TODO
+					.to("direct:availability");
 
 		rest("/order")
 				.consumes("application/json")
 				.produces("application/json")
 				.put().type(ClientOrder.class).outType(OrderReceipt.class)
-					.to("direct:TODO"); // TODO
+					.to("direct:order");
 
 		from("direct:catalogList")
 				.removeHeaders("CamelHttp*")
@@ -138,9 +138,9 @@ public class StoreRoute extends RouteBuilder {
 
 				.choice()
 					.when(simple("${body.storeId} == ''"))
-						.to("direct:TODO") // TODO
+						.to("direct:notavailable")
 					.otherwise()
-						.to("direct:TODO") // TODO
+						.to("direct:storedb-query")
 				.endChoice();
 
 		from("direct:storedb-query")
@@ -151,7 +151,7 @@ public class StoreRoute extends RouteBuilder {
 
 				.choice()
 					.when(simple("${header.CamelSqlRowCount} == 0"))
-						.to("direct:TODO") // TODO
+						.to("direct:notavailable")
 					.otherwise()
 						.process(itemAvailabilityProcessor)
 				.endChoice();

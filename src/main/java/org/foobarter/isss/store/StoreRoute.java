@@ -140,13 +140,27 @@ public class StoreRoute extends RouteBuilder {
 					.when(simple("${body.storeId} == ''"))
 						.to("direct:notavailable")
 					.otherwise()
-						.to("direct:storedb-query")
+						.to("direct:storedb-query-with-circuit-breaker")
 				.endChoice();
+
+		from("direct:storedb-query-with-circuit-breaker")
+				.doTry()
+					.loadBalance()
+						.circuitBreaker(2, 120_000L, DataAccessResourceFailureException.class)
+						.to("direct:storedb-query")
+					.end()
+				.endDoTry()
+				.doCatch(DataAccessResourceFailureException.class)
+					.setHeader("CamelHttpResponseCode", simple("503"))
+					.setBody(constant("timeout"))
+				.doCatch(RejectedExecutionException.class)
+					.setHeader("CamelHttpResponseCode", simple("503"))
+					.setBody(constant("circuit breaker"))
+				.end();
 
 		from("direct:storedb-query")
 
 				.onException(DataAccessResourceFailureException.class)
-					.handled(true)
 					.setHeader("CamelHttpResponseCode", simple("503"))
 					.setBody(constant("Store DB takes a bit too much time, availability and delivery dates not currently available."))
 				.end()

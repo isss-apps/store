@@ -144,10 +144,18 @@ public class StoreRoute extends RouteBuilder {
 				.endChoice();
 
 		from("direct:storedb-query")
+
+				.onException(DataAccessResourceFailureException.class)
+					.handled(true)
+					.setHeader("CamelHttpResponseCode", simple("503"))
+					.setBody(constant("Store DB takes a bit too much time, availability and delivery dates not currently available."))
+				.end()
+
 				.to("sql:select id, stock, supplier_days from store_slow where id = :#${header.catalog.storeId}?" +
 						"dataSource=dataSource&" +
 						"outputType=SelectOne&" +
-						"outputClass=org.foobarter.isss.store.model.storedb.AvailabilityResult")
+						"outputClass=org.foobarter.isss.store.model.storedb.AvailabilityResult" +
+						"&template.queryTimeout=5")
 
 				.choice()
 					.when(simple("${header.CamelSqlRowCount} == 0"))

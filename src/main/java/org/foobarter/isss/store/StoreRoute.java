@@ -3,7 +3,6 @@ package org.foobarter.isss.store;
 import org.apache.camel.Exchange;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.component.jackson.JacksonDataFormat;
-import org.apache.camel.model.RouteDefinition;
 import org.apache.camel.model.dataformat.JsonLibrary;
 import org.apache.camel.model.rest.RestBindingMode;
 
@@ -40,7 +39,6 @@ public class StoreRoute extends RouteBuilder {
 	@Autowired
 	private OrderItemAggregationStrategy orderItemAggregationStrategy;
 
-
 	@Value("${service.store.order.url}")
 	private String storeOrderServiceUrl;
 
@@ -53,30 +51,32 @@ public class StoreRoute extends RouteBuilder {
 	@Value("${rest.port}")
 	private int port;
 
-	private RouteDefinition cleanHttpHeaders(RouteDefinition route) {
-		return route.removeHeaders("CamelHttp*")
-			.removeHeader("Host")
-			.removeHeader("CamelServletContextPath");
-	}
-
 	private void configureWebClient() throws Exception {
 		rest("/")
 				.get("/")
-				.route()
-				.process(x -> {
-					x.getOut().setHeader(Exchange.CONTENT_TYPE, "text/html");
-					x.getOut().setBody(StoreRoute.class.getResourceAsStream("/index.html"));
-				})
-				.endRest()
+					.route()
+						.process(x -> {
+							x.getOut().setHeader(Exchange.CONTENT_TYPE, "text/html");
+							x.getOut().setBody(StoreRoute.class.getResourceAsStream("/index.html"));
+						})
+					.endRest()
 				.get("/jquery.js")
-				.route()
-				.process(x -> {
-					x.getOut().setHeader(Exchange.CONTENT_TYPE, "text/javascript");
-					x.getOut().setBody(StoreRoute.class.getResourceAsStream("/jquery.js"));
-				});
+					.route()
+						.process(x -> {
+							x.getOut().setHeader(Exchange.CONTENT_TYPE, "text/javascript");
+							x.getOut().setBody(StoreRoute.class.getResourceAsStream("/jquery.js"));
+						});
 	}
 
-	private void configureCatalog() throws Exception {
+    @Override
+    public void configure() throws Exception {
+
+		getContext().getShutdownStrategy().setTimeout(10);
+
+		restConfiguration().component("jetty").host(host).port(port).bindingMode(RestBindingMode.auto);
+
+		configureWebClient();
+
 		final JacksonDataFormat clientCatalogEntriesListDataFormat = new JacksonDataFormat();
 		clientCatalogEntriesListDataFormat.useList();
 		clientCatalogEntriesListDataFormat.setUnmarshalType(ClientCatalogEntry.class);
@@ -87,6 +87,17 @@ public class StoreRoute extends RouteBuilder {
 					.to("direct:catalogList")
 				.get("/list").outTypeList(ClientCatalogEntry.class)
 					.to("direct:catalogRoot");
+
+		rest("/availability")
+				.produces("application/json")
+				.get("/{id}").outType(ItemAvailability.class)
+					.to("direct:availability");
+
+		rest("/order")
+				.consumes("application/json")
+				.produces("application/json")
+				.put().type(ClientOrder.class).outType(OrderReceipt.class)
+					.to("direct:order");
 
 		from("direct:catalogList")
 				.removeHeaders("CamelHttp*")
@@ -109,13 +120,6 @@ public class StoreRoute extends RouteBuilder {
 				.setHeader(Exchange.HTTP_URI, constant(storeCatalogServiceUrl))
 				.to("http4:somehost?headerFilterStrategy=noHeaderStrategy")
 				.unmarshal(clientCatalogEntriesListDataFormat);
-	}
-
-	private void configureAvailability() throws Exception {
-		rest("/availability")
-				.produces("application/json")
-				.get("/{id}").outType(ItemAvailability.class)
-				.to("direct:availability");
 
 		from("direct:availability")
 				.removeHeaders("CamelHttp*")
@@ -141,7 +145,6 @@ public class StoreRoute extends RouteBuilder {
 				.endChoice();
 
 		from("direct:storedb-query")
-
 				.to("sql:select id, stock, supplier_days from store_slow where id = :#${header.catalog.storeId}?" +
 						"dataSource=dataSource&" +
 						"outputType=SelectOne&" +
@@ -157,15 +160,6 @@ public class StoreRoute extends RouteBuilder {
 		from("direct:notavailable")
 				.setHeader("CamelHttpResponseCode", simple("404"))
 				.setBody(constant("This item is not available anymore, sorry for inconvenience!"));
-	}
-
-	private void configureOrder() {
-
-		rest("/order")
-				.consumes("application/json")
-				.produces("application/json")
-				.put().type(ClientOrder.class).outType(OrderReceipt.class)
-				.to("direct:order");
 
 		from("direct:order")
 				.setHeader("clientOrder", body())
@@ -196,7 +190,7 @@ public class StoreRoute extends RouteBuilder {
 						x.getOut().setHeaders(x.getIn().getHeaders());
 						x.getOut().setBody(orderItem);
 					})
-				.end()
+					.end()
 
 				.removeHeaders("CamelHttp*")
 				.removeHeader("Host")
@@ -213,52 +207,5 @@ public class StoreRoute extends RouteBuilder {
 
 				.to("log:receipt?level=INFO&showAll=true&multiline=true")
 				.unmarshal().json(JsonLibrary.Jackson, OrderReceipt.class);
-	}
-
-    @Override
-    public void configure() throws Exception {
-
-		getContext().getShutdownStrategy().setTimeout(10);
-
-		restConfiguration().component("jetty").host(host).port(port).bindingMode(RestBindingMode.auto);
-
-		configureWebClient();
-		configureCatalog();
-		configureAvailability();
-		configureOrder();
-
-
-/*
-
-		from("direct:clean-http-headers")
-				.removeHeaders("CamelHttp*")
-				.removeHeader("Host")
-				.removeHeader("CamelServletContextPath")
-				.end();
-
-		from("direct:http-request")
-				.to("log:http-request?level=INFO&showAll=true&multiline=true&showStreams=true")
-				.to("http4:foobarter.org:8080?headerFilterStrategy=noHeaderStrategy");
-
-
-		from("direct:storedb-query-with-circuit-breaker")
-			.onException(RejectedExecutionException.class)
-				.handled(true)
-					.setHeader("CamelHttpResponseCode", simple("503"))
-					.setBody(constant("Store DB has been too busy, giving her a rest, availability and delivery dates not currently available."))
-			.end()
-				.loadBalance()
-					.circuitBreaker(2, 30_000L, DataAccessResourceFailureException.class)
-					.to("direct:storedb-query")
-				.end();
-
-
-
-		from("direct:notavailable")
-				.setHeader("CamelHttpResponseCode", simple("404"))
-				.setBody(constant("This item is not available anymore, sorry for inconvenience!"));
-
-*/
-
 	}
 }
